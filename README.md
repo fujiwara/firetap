@@ -1,6 +1,6 @@
 # firetap
 
-firetap is an AWS Lambda extension to transport logs to Kinesis Firehose.
+firetap is an AWS Lambda extension to transport logs to Kinesis Firehose(TODO).
 
 ## Architecture
 
