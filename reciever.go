@@ -20,7 +20,7 @@ func startReceiver() (*Receiver, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to listen: %v", err)
 	}
-	logger.Info("firetap server is listening", "path", sockPath)
+	logger.Info("receiver is listening", "path", sockPath)
 	return &Receiver{
 		listener: listener,
 	}, nil
@@ -30,7 +30,7 @@ func (r *Receiver) Run(ctx context.Context, ch chan<- string) error {
 	for {
 		select {
 		case <-ctx.Done():
-			logger.Info("shutting down server")
+			logger.Info("shutting down receiver")
 			return nil
 		default:
 		}

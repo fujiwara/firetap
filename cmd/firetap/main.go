@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"log/slog"
 	"os"
 
 	app "github.com/fujiwara/firetap"
@@ -11,18 +10,17 @@ import (
 func main() {
 	ctx := context.TODO()
 	if err := run(ctx); err != nil {
-		slog.Error("failed to run", "error", err)
-		os.Exit(1)
+		app.Fatal(err)
 	}
 }
 
 func run(ctx context.Context) error {
 	if h := os.Getenv("_HANDLER"); h != "" {
 		// in runtime
-		app.SetLogger(slog.With("firetap", "runtime"))
+		app.LogType("firetap.runtime")
 		return app.Wrapper(ctx, h)
 	}
 	// otherwise, in extension
-	app.SetLogger(slog.With("firetap", "extension"))
+	app.LogType("firetap.extension")
 	return app.Run(ctx)
 }

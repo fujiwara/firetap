@@ -32,11 +32,16 @@ const (
 func init() {
 	lambdaAPIEndpoint = "http://" + os.Getenv("AWS_LAMBDA_RUNTIME_API") + "/2020-01-01/extension"
 	lambdaExtensionName = filepath.Base(os.Args[0])
-	logger = &slog.Logger{}
+	logger = slog.New(slog.NewJSONHandler(os.Stdout, nil)) // default logger
 }
 
-func SetLogger(l *slog.Logger) {
-	logger = l
+func LogType(name string) {
+	logger = logger.With("type", name)
+}
+
+func Fatal(err error) {
+	logger.Error("fatal error", "error", err)
+	os.Exit(1)
 }
 
 func Wrapper(ctx context.Context, handler string) error {
@@ -46,11 +51,11 @@ func Wrapper(ctx context.Context, handler string) error {
 	if !filepath.IsAbs(handler) {
 		handler = filepath.Join(os.Getenv("LAMBDA_TASK_ROOT"), handler)
 	}
-	logger.Info("running child command", "firetap", "wrapper", "command", handler)
+	logger.Info("running child command", "command", handler)
 
 	conn, err := net.Dial("unix", sockPath)
 	if err != nil {
-		return fmt.Errorf("failed to connect to server: %v", err)
+		return fmt.Errorf("failed to connect to receiver: %v", err)
 	}
 	defer conn.Close()
 	cmd := exec.CommandContext(ctx, handler)
