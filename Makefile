@@ -25,6 +25,6 @@ layer.zip: extensions/firetap
 
 publish-layer: layer.zip
 	aws lambda publish-layer-version \
-		--layer-name test-layer-1 \
+		--layer-name firetap \
 		--zip-file fileb://layer.zip \
 		--compatible-runtimes provided.al2023 provided.al2

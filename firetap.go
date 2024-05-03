@@ -26,6 +26,7 @@ const (
 	lambdaExtensionNameHeader       = "Lambda-Extension-Name"
 	lambdaExtensionIdentifierHeader = "Lambda-Extension-Identifier"
 	sockPath                        = "/tmp/firetap.sock"
+	antiRecursionEnv                = "FIRETAP_WRAPPED"
 )
 
 func init() {
@@ -39,6 +40,9 @@ func SetLogger(l *slog.Logger) {
 }
 
 func Wrapper(ctx context.Context, handler string) error {
+	if os.Getenv(antiRecursionEnv) != "" {
+		panic("recursive execution detected!!!")
+	}
 	if !filepath.IsAbs(handler) {
 		handler = filepath.Join(os.Getenv("LAMBDA_TASK_ROOT"), handler)
 	}
@@ -49,7 +53,7 @@ func Wrapper(ctx context.Context, handler string) error {
 		return fmt.Errorf("failed to connect to server: %v", err)
 	}
 	defer conn.Close()
-	cmd := exec.CommandContext(ctx, "./"+"handler")
+	cmd := exec.CommandContext(ctx, handler)
 	cmd.Stdout = conn
 	cmd.Stderr = os.Stderr
 	cmd.Stdin = os.Stdin
@@ -58,6 +62,8 @@ func Wrapper(ctx context.Context, handler string) error {
 		return cmd.Process.Signal(syscall.SIGTERM)
 	}
 	cmd.WaitDelay = 1500 * time.Millisecond
+	cmd.Env = os.Environ()
+	cmd.Env = append(cmd.Env, antiRecursionEnv+"=1")
 
 	if err := cmd.Run(); err != nil {
 		exitCode := wrapcommander.ResolveExitCode(err)

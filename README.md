@@ -10,7 +10,7 @@ XXX: This is a work in progress.
    - Runs server that listens to the UNIX domain socket `/tmp/firetap.sock`.
    - Reads logs from the socket and sends them to Kinesis Firehose.
 2. Run `firetap` as a bootstrap wrapper command.
-   - Invokes `./handler` as a subprocess (This is YOUR Lambda function).
+   - Invokes `handler` as a subprocess (This is YOUR Lambda function).
    - Reads the standard output of the subprocess and sends it to the extension.
 
 ## Usage
@@ -37,7 +37,7 @@ You can use `firetap` as a bootstrap wrapper command.
 
 When the `firetrap` binary runs as a Lambda runtime, it runs your Lambda function as a subprocess and sends the standard output of the subprocess to the extension via the UNIX socket.
 
-You simply need to place the `firetrap` binary as `bootstrap` in the Lambda package. Your Lambda function should be placed as a `handler.`
+You simply need to place the `firetrap` binary as `bootstrap` in the Lambda package. Your Lambda function should be placed as a `handler` (the lambda function configuration `.Handler` element) in the same directory.
 
 ```
 .
