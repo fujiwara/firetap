@@ -17,5 +17,12 @@ func main() {
 }
 
 func run(ctx context.Context) error {
+	if h := os.Getenv("_HANDLER"); h != "" {
+		// in runtime
+		app.SetLogger(slog.With("firetap", "runtime"))
+		return app.Wrapper(ctx, h)
+	}
+	// otherwise, in extension
+	app.SetLogger(slog.With("firetap", "extension"))
 	return app.Run(ctx)
 }
