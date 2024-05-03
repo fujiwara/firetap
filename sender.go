@@ -21,7 +21,6 @@ var firehoseRetryPolicy = retry.Policy{
 type LogSender struct {
 	stream   string
 	buf      []string
-	ch       chan string
 	firehose *firehose.Client
 }
 
@@ -34,18 +33,22 @@ func startSender(ctx context.Context, stream string) (*LogSender, error) {
 
 	return &LogSender{
 		stream:   stream,
-		ch:       make(chan string, maxFirehoseBatchSize),
 		firehose: firehoseClient,
 	}, nil
 }
 
 func (s *LogSender) Run(ctx context.Context, rch <-chan string) error {
+	go s.periodicFlush(ctx)
 	for {
 		select {
 		case <-ctx.Done():
 			return nil
 		case msg := <-rch:
-			s.ch <- msg
+			if len(s.buf) < maxFirehoseBatchSize {
+				s.buf = append(s.buf, msg)
+			} else {
+				logger.Warn("overflow", "message", msg)
+			}
 		}
 	}
 }
@@ -59,12 +62,6 @@ func (s *LogSender) periodicFlush(ctx context.Context) {
 			return
 		case <-tk.C:
 			s.flush(ctx)
-		default:
-			if len(s.ch) >= maxFirehoseBatchSize {
-				s.flush(ctx)
-			} else {
-				time.Sleep(100 * time.Millisecond)
-			}
 		}
 	}
 }
@@ -75,7 +72,7 @@ func (s *LogSender) flush(ctx context.Context) {
 	}
 	recs := make([]types.Record, 0, len(s.buf))
 	for _, r := range s.buf {
-		recs = append(recs, types.Record{Data: []byte(r)})
+		recs = append(recs, types.Record{Data: []byte(r + "\n")})
 	}
 	logger.Debug("sending to firehose", "records", len(recs))
 
@@ -88,6 +85,9 @@ func (s *LogSender) flush(ctx context.Context) {
 	})
 	if err != nil {
 		logger.Warn("failed to send to firehose", "error", err)
+	} else {
+		logger.Info("sent to firehose", "records", len(recs))
+		s.buf = s.buf[:0]
 	}
 	for _, m := range s.buf {
 		logger.Warn("overflow", "message", m)
