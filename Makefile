@@ -27,4 +27,4 @@ publish-layer: layer.zip
 	aws lambda publish-layer-version \
 		--layer-name test-layer-1 \
 		--zip-file fileb://layer.zip \
-		--compatible-runtimes provided.al2023
+		--compatible-runtimes provided.al2023 provided.al2
