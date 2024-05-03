@@ -1,4 +1,5 @@
 .PHONY: clean test
+export CGO_ENABLED=0
 
 firetap: go.* *.go
 	go build -o $@ cmd/firetap/main.go
@@ -14,3 +15,16 @@ install:
 
 dist:
 	goreleaser build --snapshot --rm-dist
+
+extensions/firetap: firetap
+	mkdir -p extensions
+	cp firetap extensions/firetap
+
+layer.zip: extensions/firetap
+	zip -r layer.zip extensions/
+
+publish-layer: layer.zip
+	aws lambda publish-layer-version \
+		--layer-name test-layer-1 \
+		--zip-file fileb://layer.zip \
+		--compatible-runtimes provided.al2023
