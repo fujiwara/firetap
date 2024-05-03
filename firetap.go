@@ -78,7 +78,7 @@ func Wrapper(ctx context.Context, handler string) error {
 	return nil
 }
 
-func Run(ctx context.Context) error {
+func Run(ctx context.Context, opt *Option) error {
 	ext := NewExtensionClient()
 	if err := ext.Register(ctx); err != nil {
 		logger.Error("failed to register extension", "error", err)
@@ -90,7 +90,8 @@ func Run(ctx context.Context) error {
 		logger.Error("failed to start receiver", "error", err)
 		return err
 	}
-	sn, err := startSender()
+
+	sn, err := startSender(ctx, opt.StreamName)
 	if err != nil {
 		logger.Error("failed to start sender", "error", err)
 		return err

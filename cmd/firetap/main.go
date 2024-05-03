@@ -21,6 +21,10 @@ func run(ctx context.Context) error {
 		return app.Wrapper(ctx, h)
 	}
 	// otherwise, in extension
+	opt, err := app.NewOption()
+	if err != nil {
+		return err
+	}
 	app.LogType("firetap.extension")
-	return app.Run(ctx)
+	return app.Run(ctx, opt)
 }
