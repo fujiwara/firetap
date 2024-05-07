@@ -18,7 +18,7 @@ import (
 var (
 	lambdaAPIEndpoint   string
 	lambdaExtensionName string
-	bufferSize          = 1000
+	bufferSize          = 10000
 	logger              *slog.Logger
 )
 
@@ -80,6 +80,7 @@ func Wrapper(ctx context.Context, handler string) error {
 
 func Run(ctx context.Context, opt *Option) error {
 	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
 
 	ext := NewExtensionClient()
 	if err := ext.Register(ctx); err != nil {
