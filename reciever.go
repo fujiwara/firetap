@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"context"
 	"fmt"
+	"io"
 	"net"
 	"os"
 )
@@ -26,7 +27,7 @@ func startReceiver() (*Receiver, error) {
 	}, nil
 }
 
-func (r *Receiver) Run(ctx context.Context, ch chan<- string) error {
+func (r *Receiver) Run(ctx context.Context, ch chan<- []byte) error {
 	for {
 		select {
 		case <-ctx.Done():
@@ -43,19 +44,24 @@ func (r *Receiver) Run(ctx context.Context, ch chan<- string) error {
 	}
 }
 
-func (s *Receiver) handleConnection(conn net.Conn, ch chan<- string) {
+func (s *Receiver) handleConnection(conn net.Conn, ch chan<- []byte) {
 	defer conn.Close()
-	scanner := bufio.NewScanner(conn)
-	for scanner.Scan() {
-		msg := scanner.Text()
-		select {
-		case ch <- msg:
-		default:
-			logger.Warn("overflow", "message", msg)
+	scanner := bufio.NewReader(conn)
+	for {
+		line, err := scanner.ReadBytes('\n')
+		if err == io.EOF {
+			if len(line) == 0 {
+				// EOF
+				break
+			}
+		} else if err != nil {
+			logger.Error("reading from client", "error", err)
+			break
 		}
-	}
-
-	if err := scanner.Err(); err != nil {
-		logger.Error("reading from client", "error", err)
+		select {
+		case ch <- line:
+		default:
+			logger.Warn("overflow", "message", string(line))
+		}
 	}
 }

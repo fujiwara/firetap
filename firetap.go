@@ -79,6 +79,8 @@ func Wrapper(ctx context.Context, handler string) error {
 }
 
 func Run(ctx context.Context, opt *Option) error {
+	ctx, cancel := context.WithCancel(ctx)
+
 	ext := NewExtensionClient()
 	if err := ext.Register(ctx); err != nil {
 		logger.Error("failed to register extension", "error", err)
@@ -97,13 +99,13 @@ func Run(ctx context.Context, opt *Option) error {
 		return err
 	}
 
-	ch := make(chan string, bufferSize)
+	ch := make(chan []byte, bufferSize)
 
 	var wg sync.WaitGroup
 	wg.Add(3)
 	go func() {
 		defer wg.Done()
-		err := ext.Run(ctx)
+		err := ext.Run(ctx, cancel)
 		if err != nil {
 			logger.Error("failed to run extension", "error", err)
 		}

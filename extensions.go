@@ -6,22 +6,27 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"strconv"
 	"strings"
 )
 
 type ExtensionClient struct {
 	extensionId string
 	client      *http.Client
+	skip        bool
 }
 
 func NewExtensionClient() *ExtensionClient {
+	s, _ := strconv.ParseBool(os.Getenv("FIRETAP_SKIP_EXTENSION"))
+	logger.Info("extension client created", "skip", s)
 	return &ExtensionClient{
 		client: http.DefaultClient,
+		skip:   s,
 	}
 }
 
 func (c *ExtensionClient) Register(ctx context.Context) error {
-	if os.Getenv("FIRETAP_SKIP_EXTENSION") != "" {
+	if c.skip {
 		logger.Info("skipping extension registration")
 		return nil
 	}
@@ -50,34 +55,44 @@ func (c *ExtensionClient) Register(ctx context.Context) error {
 	return nil
 }
 
-func (c *ExtensionClient) Run(ctx context.Context) error {
-	if os.Getenv("FIRETAP_SKIP_EXTENSION") != "" {
+func (c *ExtensionClient) fetchNextEvent(ctx context.Context) (string, error) {
+	u := fmt.Sprintf("%s/event/next", lambdaAPIEndpoint)
+	logger.Debug("getting next event", "url", u, "extension_id", c.extensionId)
+	req, _ := http.NewRequestWithContext(ctx, "GET", u, nil)
+	req.Header.Set(lambdaExtensionIdentifierHeader, c.extensionId)
+	resp, err := c.client.Do(req)
+	if err != nil {
+		return "", fmt.Errorf("failed to get next event: %v", err)
+	}
+	defer resp.Body.Close()
+	var event map[string]interface{}
+	if err := json.NewDecoder(resp.Body).Decode(&event); err != nil {
+		return "", fmt.Errorf("failed to decode event: %v", err)
+	}
+	logger.Debug("event received", "event", event)
+	if ev, ok := event["eventType"].(string); ok {
+		return ev, nil
+	}
+	return "", fmt.Errorf("eventType not found: %v", event)
+}
+
+func (c *ExtensionClient) Run(ctx context.Context, cancel func()) error {
+	if c.skip {
 		logger.Info("skipping extension running")
 		<-ctx.Done()
 		return nil
 	}
-	eventURL := fmt.Sprintf("%s/event/next", lambdaAPIEndpoint)
 	for {
-		logger.Debug("getting next event")
-		req, _ := http.NewRequestWithContext(ctx, "GET", eventURL, nil)
-		req.Header.Set(lambdaExtensionIdentifierHeader, c.extensionId)
-		resp, err := c.client.Do(req)
+		ev, err := c.fetchNextEvent(ctx)
 		if err != nil {
-			return fmt.Errorf("failed to get next event: %v", err)
+			return err
 		}
-		defer resp.Body.Close()
-
-		var event map[string]interface{}
-		if err := json.NewDecoder(resp.Body).Decode(&event); err != nil {
-			return fmt.Errorf("failed to decode event: %v", err)
-		}
-		logger.Debug("event received", "event", event)
-
-		switch event["eventType"] {
+		switch ev {
 		case "INVOKE":
 			logger.Debug("invoke event received")
 		case "SHUTDOWN":
-			logger.Debug("shutdown event received")
+			logger.Debug("shutdown event received. shutting down extension")
+			cancel()
 			return nil
 		}
 	}
