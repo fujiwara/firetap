@@ -1,6 +1,6 @@
 # firetap
 
-firetap is an AWS Lambda extension to transport logs to Kinesis Firehose.
+firetap is an AWS Lambda extension to transport logs to Kinesis Data Firehose or Kinesis Data Streams.
 
 This is an alpha version and not recommended for production use.
 
@@ -30,6 +30,13 @@ $ aws lambda publish-layer-version \
 		--zip-file fileb://layer.zip \
 		--compatible-runtimes provided.al2023 provided.al2
 ```
+
+#### Configurations
+
+You can configure `firetap` by setting environment variables.
+
+- `FIRETAP_STREAM_NAME`: The name of the Kinesis Data Firehose or Kinesis Data Streams stream.
+- `FIRETAP_USE_DATA_STREAM`: Set `true` if you want to use Kinesis Data Streams. Default is `false` (use Firehose).
 
 ### Bootstrap Wrapper
 
