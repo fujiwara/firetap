@@ -1,8 +1,8 @@
 # firetap
 
-firetap is an AWS Lambda extension to transport logs to Kinesis Firehose(TODO).
+firetap is an AWS Lambda extension to transport logs to Kinesis Firehose.
 
-XXX: This is a work in progress.
+This is an alpha version and not recommended for production use.
 
 ## Architecture
 
@@ -37,7 +37,12 @@ You can use `firetap` as a bootstrap wrapper command.
 
 When the `firetrap` binary runs as a Lambda runtime, it runs your Lambda function as a subprocess and sends the standard output of the subprocess to the extension via the UNIX socket.
 
-You simply need to place the `firetrap` binary as `bootstrap` in the Lambda package. Your Lambda function should be placed as a `handler` (the lambda function configuration `.Handler` element) in the same directory.
+You can prepare `bootstrap` shell script as below. Your Lambda function should be placed as a `handler` (the lambda function configuration `.Handler` element) in the same directory.
+
+```sh
+#!/bin/sh
+exec /opt/extensions/firetap
+```
 
 ```
 .
