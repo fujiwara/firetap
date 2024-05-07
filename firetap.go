@@ -79,6 +79,8 @@ func Wrapper(ctx context.Context, handler string) error {
 }
 
 func Run(ctx context.Context, opt *Option) error {
+	logger.Info("running firetap", "option", opt)
+
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
@@ -94,7 +96,7 @@ func Run(ctx context.Context, opt *Option) error {
 		return err
 	}
 
-	sn, err := startSender(ctx, opt.StreamName)
+	sn, err := startSender(ctx, opt.StreamName, opt.DataStream)
 	if err != nil {
 		logger.Error("failed to start sender", "error", err)
 		return err
