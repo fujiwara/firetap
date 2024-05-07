@@ -33,9 +33,9 @@ $ aws lambda publish-layer-version \
 
 ### Bootstrap Wrapper
 
-You can use `firetap` as a bootstrap wrapper command.
+`firetap` is also designed to work as a bootstrap wrapper command.
 
-When the `firetrap` binary runs as a Lambda runtime, it runs your Lambda function as a subprocess and sends the standard output of the subprocess to the extension via the UNIX socket.
+When the `firetrap` binary runs as a Lambda runtime, it runs your Lambda function as a subprocess and sends the standard output of the subprocess to the extension via the UNIX socket. The standard error of the subprocess is not sent to the extension.
 
 You can prepare `bootstrap` shell script as below. Your Lambda function should be placed as a `handler` (the lambda function configuration `.Handler` element) in the same directory.
 
