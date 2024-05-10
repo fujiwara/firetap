@@ -51,6 +51,6 @@ jobs:
         with:
           version: latest
           args: release
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        #env:
+          # GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         if: ${{ steps.tagpr.outputs.tag != '' || github.event_name == 'workflow_dispatch' }}
