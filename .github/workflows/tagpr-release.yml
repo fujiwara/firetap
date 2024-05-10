@@ -41,8 +41,8 @@ jobs:
       - id: tagpr
         run: |
           tagpr
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        #env:
+          #GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         if: ${{ github.event_name != 'workflow_dispatch' }} # skip on workflow_dispatch
 
       # after tagpr adds a release tag, or workflow_dispatch, release it
@@ -51,6 +51,6 @@ jobs:
         with:
           version: latest
           args: release
-        #env:
-          # GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        env:
+           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         if: ${{ steps.tagpr.outputs.tag != '' || github.event_name == 'workflow_dispatch' }}
