@@ -26,23 +26,11 @@ jobs:
         uses: actions/setup-go@v5
         with:
           go-version: "1.22"
-      - id: build-tagpr
-        run: |
-          cd /tmp
-          git clone https://github.com/fujiwara/tagpr.git
-          cd tagpr
-          git switch show-error
-          go build -o tagpr cmd/tagpr/main.go
-          install -m 755 tagpr /usr/local/bin/tagpr
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        if: ${{ github.event_name != 'workflow_dispatch' }} # skip on workflow_dispatch
 
       - id: tagpr
-        run: |
-          tagpr
+        uses: Songmu/tagpr@v1
         env:
-          GITHUB_TOKEN: dummy
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         if: ${{ github.event_name != 'workflow_dispatch' }} # skip on workflow_dispatch
 
       # after tagpr adds a release tag, or workflow_dispatch, release it
