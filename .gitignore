@@ -15,6 +15,6 @@
 # vendor/
 
 .envrc
-./firetap
+/firetap
 *.zip
 extensions/

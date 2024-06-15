@@ -33,7 +33,6 @@ func (c *ExtensionClient) Register(ctx context.Context) error {
 		return nil
 	}
 	registerURL := fmt.Sprintf("%s/register", lambdaExtensionAPIEndpoint)
-	// req, _ := http.NewRequestWithContext(ctx, "POST", registerURL, strings.NewReader(`{"events":["INVOKE","SHUTDOWN"]}`))
 	req, _ := http.NewRequestWithContext(ctx, "POST", registerURL, strings.NewReader(`{"events":["SHUTDOWN"]}`))
 	req.Header.Set(lambdaExtensionNameHeader, lambdaExtensionName)
 	logger.Info("registering extension", "url", registerURL, "name", lambdaExtensionName, "headers", req.Header)
@@ -151,9 +150,9 @@ func NewTelemetrySubscription(endpoint string) *TelemetrySubscription {
 		SchemaVersion: "2022-12-13",
 		Types:         []string{"function", "platform"},
 		Buffering: TelemetryBuffering{
-			MaxItems:  1000,
-			MaxBytes:  256 * 1024,
-			TimeoutMs: 100,
+			MaxItems:  500,
+			MaxBytes:  1024 * 1024,
+			TimeoutMs: 1000,
 		},
 		Destination: TelemetryDestination{
 			Protocol: "HTTP",
