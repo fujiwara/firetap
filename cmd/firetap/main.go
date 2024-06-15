@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"os"
 
 	app "github.com/fujiwara/firetap"
 )
@@ -15,12 +14,6 @@ func main() {
 }
 
 func run(ctx context.Context) error {
-	if h := os.Getenv("_HANDLER"); h != "" {
-		// in runtime
-		app.LogType("firetap.runtime")
-		return app.Wrapper(ctx, h)
-	}
-	// otherwise, in extension
 	opt, err := app.NewOption()
 	if err != nil {
 		return err

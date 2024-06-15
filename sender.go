@@ -2,6 +2,8 @@ package firetap
 
 import (
 	"context"
+	"fmt"
+	"sync"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/config"
@@ -26,9 +28,10 @@ type LogSender struct {
 	bufSize    int
 	firehose   *firehose.Client
 	kinesis    *kinesis.Client
+	mu         sync.Mutex
 }
 
-func startSender(ctx context.Context, streamName string, dataStream bool) (*LogSender, error) {
+func NewSender(ctx context.Context, streamName string, dataStream bool) (*LogSender, error) {
 	awsCfg, err := config.LoadDefaultConfig(ctx)
 	if err != nil {
 		return nil, err
@@ -45,38 +48,33 @@ func startSender(ctx context.Context, streamName string, dataStream bool) (*LogS
 	return s, nil
 }
 
-func (s *LogSender) Run(ctx context.Context, rch <-chan []byte) error {
-	tk := time.NewTicker(1 * time.Second)
-	defer tk.Stop()
-	for {
-		select {
-		case <-ctx.Done():
-			s.flush(context.Background()) // flush remaining logs
-			return nil
-		case <-tk.C:
-			s.flush(ctx)
-		case msg := <-rch:
-			if len(s.buf) == maxBatchSize || s.bufSize+len(msg) > 1024*512 {
-				s.flush(ctx)
-			}
-			s.bufSize += len(msg)
-			s.buf = append(s.buf, msg)
+func (s *LogSender) Send(ctx context.Context, msg []byte) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if len(s.buf) == maxBatchSize || s.bufSize+len(msg) > 1024*512 {
+		if err := s.Flush(ctx); err != nil {
+			return fmt.Errorf("failed to flush: %w", err)
 		}
 	}
+	s.bufSize += len(msg)
+	s.buf = append(s.buf, msg)
+	return nil
 }
 
-func (s *LogSender) flush(ctx context.Context) {
+func (s *LogSender) Flush(ctx context.Context) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	if len(s.buf) == 0 {
-		return
+		return nil
 	}
 	if s.kinesis != nil {
-		s.flushToKinesis(ctx)
+		return s.flushToKinesis(ctx)
 	} else {
-		s.flushToFirehose(ctx)
+		return s.flushToFirehose(ctx)
 	}
 }
 
-func (s *LogSender) flushToFirehose(ctx context.Context) {
+func (s *LogSender) flushToFirehose(ctx context.Context) error {
 	recs := make([]firehoseTypes.Record, 0, len(s.buf))
 	for _, r := range s.buf {
 		recs = append(recs, firehoseTypes.Record{Data: r})
@@ -91,22 +89,19 @@ func (s *LogSender) flushToFirehose(ctx context.Context) {
 		return err
 	})
 	if err != nil {
-		logger.Warn("failed to send to firehose", "error", err)
-		for _, m := range s.buf {
-			logger.Warn("overflow", "message", string(m))
-		}
+		return fmt.Errorf("failed to send to firehose: %w", err)
 	} else {
 		logger.Info("sent to firehose", "records", len(recs))
 	}
 	s.resetBuffer()
+	return nil
 }
 
-func (s *LogSender) flushToKinesis(ctx context.Context) {
+func (s *LogSender) flushToKinesis(ctx context.Context) error {
 	recs := make([]kinesisTypes.PutRecordsRequestEntry, 0, len(s.buf))
 	for _, r := range s.buf {
 		recs = append(recs, kinesisTypes.PutRecordsRequestEntry{Data: r})
 	}
-
 	logger.Debug("sending to kinesis", "records", len(recs))
 
 	err := retryPolicy.Do(ctx, func() error {
@@ -117,14 +112,12 @@ func (s *LogSender) flushToKinesis(ctx context.Context) {
 		return err
 	})
 	if err != nil {
-		logger.Warn("failed to send to kinesis", "error", err)
-		for _, m := range s.buf {
-			logger.Warn("overflow", "message", string(m))
-		}
+		return fmt.Errorf("failed to send to kinesis: %w", err)
 	} else {
 		logger.Info("sent to kinesis", "records", len(recs))
 	}
 	s.resetBuffer()
+	return nil
 }
 
 func (s *LogSender) resetBuffer() {
