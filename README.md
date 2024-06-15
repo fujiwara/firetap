@@ -6,12 +6,18 @@ This is an alpha version and not recommended for production use.
 
 ## Architecture
 
-1. Run `firetap` as an AWS Lambda extension.
-   - Runs server that listens to the UNIX domain socket `/tmp/firetap.sock`.
-   - Reads logs from the socket and sends them to Kinesis Firehose.
-2. Run `firetap` as a bootstrap wrapper command.
-   - Invokes `handler` as a subprocess (This is YOUR Lambda function).
-   - Reads the standard output of the subprocess and sends it to the extension.
+Run `firetap` as an AWS Lambda extension.
+
+- Runs HTTP server that receive telemetries using [Lambda Telemetry API](https://docs.aws.amazon.com/en/lambda/latest/dg/telemetry-api.html).
+- Sends function logs to Kinesis Data Firehose / Streams.
+
+### Limitations
+
+The execution of the Lambda function is stopped after it returns the response to the invoker. The telemetry API is called asynchronously, so all logs may not be sent to the Kinesis Data Firehose / Streams if the function is stopped before they are sent.
+
+firetap waits for the SHUTDOWN event to be called before terminating the Lambda function. When the SHUTDOWN event is received, if the remaining logs exist, they are sent to the Kinesis Data Firehose / Streams.
+
+Normally, the SHUTDOWN event is sent after about 5 minutes of the function being idle. So, the logs delayed by up to 5 minutes may be sent. (However, the AWS Lambda specification does not guarantee the delay time.)
 
 ## Usage
 
@@ -38,24 +44,6 @@ You can configure `firetap` by setting environment variables.
 - `FIRETAP_STREAM_NAME`: The name of the Kinesis Data Firehose or Kinesis Data Streams stream.
 - `FIRETAP_USE_DATA_STREAM`: Set `true` if you want to use Kinesis Data Streams. Default is `false` (use Firehose).
 
-### Bootstrap Wrapper
-
-`firetap` is also designed to work as a bootstrap wrapper command.
-
-When the `firetrap` binary runs as a Lambda runtime, it runs your Lambda function as a subprocess and sends the standard output of the subprocess to the extension via the UNIX socket. The standard error of the subprocess is not sent to the extension.
-
-You can prepare `bootstrap` shell script as below. Your Lambda function should be placed as a `handler` (the lambda function configuration `.Handler` element) in the same directory.
-
-```sh
-#!/bin/sh
-exec /opt/extensions/firetap
-```
-
-```
-.
-├── bootstrap
-└── handler
-```
 
 ## LICENSE
 

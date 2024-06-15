@@ -5,7 +5,7 @@ firetap: go.* *.go
 	go build -o $@ cmd/firetap/main.go
 
 clean:
-	rm -rf firetap dist/
+	rm -rf firetap layer.zip dist/
 
 test:
 	go test -v ./...
