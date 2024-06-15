@@ -1,5 +1,7 @@
 # Changelog
 
+## [v0.0.5](https://github.com/fujiwara/firetap/compare/v0.0.4...v0.0.5) - 2024-06-15
+
 ## [v0.0.4](https://github.com/fujiwara/firetap/compare/v0.0.3...v0.0.4) - 2024-06-15
 - switch to use the Telemetry API. by @fujiwara in https://github.com/fujiwara/firetap/pull/6
 - Bump the aws-sdk-go-v2 group with 3 updates by @dependabot in https://github.com/fujiwara/firetap/pull/5
