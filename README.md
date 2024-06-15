@@ -8,7 +8,7 @@ This is an alpha version and not recommended for production use.
 
 Run `firetap` as an AWS Lambda extension.
 
-- Runs HTTP server that receive telemetries using [Lambda Telemetry API](https://docs.aws.amazon.com/en/lambda/latest/dg/telemetry-api.html).
+- Runs HTTP server that receive telemetries using [Lambda Telemetry API](https://docs.aws.amazon.com/lambda/latest/dg/telemetry-api.html).
 - Sends function logs to Kinesis Data Firehose / Streams.
 
 ### Limitations
