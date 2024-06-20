@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -13,15 +14,30 @@ import (
 
 type testLogSender struct {
 	logs []byte
+	mu   sync.Mutex
 }
 
 func (s *testLogSender) Send(ctx context.Context, log []byte) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	s.logs = append(s.logs, log...)
 	return nil
 }
 
 func (s *testLogSender) Flush(ctx context.Context) error {
 	return nil
+}
+
+func (s *testLogSender) Len() int {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return len(s.logs)
+}
+
+func (s *testLogSender) String() string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return string(s.logs)
 }
 
 func TestTelemetryAPI(t *testing.T) {
@@ -46,7 +62,7 @@ func TestTelemetryAPI(t *testing.T) {
 	}
 	time.Sleep(1000 * time.Millisecond)
 
-	if string(sender.logs) != strings.Repeat("foo\nbar\nbaz\n", 5) {
+	if sender.String() != strings.Repeat("foo\nbar\nbaz\n", 5) {
 		t.Errorf("unexpected logs: %s", sender.logs)
 	}
 }
