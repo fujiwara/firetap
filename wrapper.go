@@ -117,6 +117,7 @@ func (c *TelemetryAPIClient) readEvents(ctx context.Context) {
 }
 
 func (c *TelemetryAPIClient) Run(ctx context.Context) {
+	defer slog.InfoContext(ctx, "telemetry client stopped")
 	go c.readEvents(ctx)
 
 	ctx = slogcontext.WithValue(ctx, "component", "telemetry-client")
