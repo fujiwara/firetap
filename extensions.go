@@ -6,10 +6,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"os"
-	"strconv"
 	"strings"
+
+	slogcontext "github.com/PumpkinSeed/slog-context"
 )
 
 type ExtensionClient struct {
@@ -18,9 +20,14 @@ type ExtensionClient struct {
 	skip        bool
 }
 
-func NewExtensionClient() *ExtensionClient {
-	s, _ := strconv.ParseBool(os.Getenv("FIRETAP_SKIP_EXTENSION"))
-	logger.Info("extension client created", "skip", s)
+func NewExtensionClient(ctx context.Context) *ExtensionClient {
+	var s bool
+	if strings.HasPrefix(os.Getenv("AWS_EXECUTION_ENV"), "AWS_Lambda") || os.Getenv("AWS_LAMBDA_RUNTIME_API") != "" {
+		slog.DebugContext(ctx, "running in AWS Lambda environment")
+	} else {
+		slog.InfoContext(ctx, "running outside of AWS Lambda environment, skipping extension client")
+		s = true
+	}
 	return &ExtensionClient{
 		client: http.DefaultClient,
 		skip:   s,
@@ -28,14 +35,15 @@ func NewExtensionClient() *ExtensionClient {
 }
 
 func (c *ExtensionClient) Register(ctx context.Context) error {
+	ctx = slogcontext.WithValue(ctx, "component", "extension-client")
 	if c.skip {
-		logger.Info("skipping extension registration")
+		slog.InfoContext(ctx, "skipping extension registration")
 		return nil
 	}
 	registerURL := fmt.Sprintf("%s/register", lambdaExtensionAPIEndpoint)
 	req, _ := http.NewRequestWithContext(ctx, "POST", registerURL, strings.NewReader(`{"events":["SHUTDOWN"]}`))
 	req.Header.Set(lambdaExtensionNameHeader, lambdaExtensionName)
-	logger.Info("registering extension", "url", registerURL, "name", lambdaExtensionName, "headers", req.Header)
+	slog.InfoContext(ctx, "registering extension", "url", registerURL, "name", lambdaExtensionName, "headers", req.Header)
 
 	resp, err := c.client.Do(req)
 	if err != nil {
@@ -47,19 +55,19 @@ func (c *ExtensionClient) Register(ctx context.Context) error {
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
 		return fmt.Errorf("failed to decode register response: %v", err)
 	}
-	logger.Info("register status", "status", resp.Status, "response", result)
+	slog.InfoContext(ctx, "register status", "status", resp.Status, "response", result)
 
 	c.extensionId = resp.Header.Get(lambdaExtensionIdentifierHeader)
 	if c.extensionId == "" {
 		return fmt.Errorf("extension identifier is empty: %d %v", resp.StatusCode, resp.Header)
 	}
-	logger.Info("extension registered", "extension_id", c.extensionId)
+	slog.InfoContext(ctx, "extension registered", "extension_id", c.extensionId)
 	return nil
 }
 
 func (c *ExtensionClient) fetchNextEvent(ctx context.Context) (string, error) {
 	u := fmt.Sprintf("%s/event/next", lambdaExtensionAPIEndpoint)
-	logger.Debug("getting next event", "url", u, "extension_id", c.extensionId)
+	slog.DebugContext(ctx, "getting next event", "url", u, "extension_id", c.extensionId)
 	req, _ := http.NewRequestWithContext(ctx, "GET", u, nil)
 	req.Header.Set(lambdaExtensionIdentifierHeader, c.extensionId)
 	resp, err := c.client.Do(req)
@@ -71,7 +79,7 @@ func (c *ExtensionClient) fetchNextEvent(ctx context.Context) (string, error) {
 	if err := json.NewDecoder(resp.Body).Decode(&event); err != nil {
 		return "", fmt.Errorf("failed to decode event: %v", err)
 	}
-	logger.Debug("event received", "event", event)
+	slog.DebugContext(ctx, "event received", "event", event)
 	if ev, ok := event["eventType"].(string); ok {
 		return ev, nil
 	}
@@ -79,8 +87,9 @@ func (c *ExtensionClient) fetchNextEvent(ctx context.Context) (string, error) {
 }
 
 func (c *ExtensionClient) Run(ctx context.Context, cancel func()) error {
+	ctx = slogcontext.WithValue(ctx, "component", "extension-client")
 	if c.skip {
-		logger.Info("skipping extension running")
+		slog.InfoContext(ctx, "skipping extension running")
 		<-ctx.Done()
 		return nil
 	}
@@ -91,9 +100,9 @@ func (c *ExtensionClient) Run(ctx context.Context, cancel func()) error {
 		}
 		switch ev {
 		case "INVOKE":
-			logger.Debug("invoke event received")
+			slog.DebugContext(ctx, "invoke event received")
 		case "SHUTDOWN":
-			logger.Debug("shutdown event received. shutting down extension")
+			slog.DebugContext(ctx, "shutdown event received. shutting down extension")
 			cancel()
 			return nil
 		}
@@ -101,8 +110,9 @@ func (c *ExtensionClient) Run(ctx context.Context, cancel func()) error {
 }
 
 func (c *ExtensionClient) SubscribeTelemetry(ctx context.Context, endpoint string) error {
+	ctx = slogcontext.WithValue(ctx, "component", "extension-client")
 	if c.skip {
-		logger.Info("skipping extension subscription to telemetry")
+		slog.InfoContext(ctx, "skipping extension subscription to telemetry")
 		return nil
 	}
 	u := lambdaTelemetryAPIEndpoint
@@ -111,7 +121,7 @@ func (c *ExtensionClient) SubscribeTelemetry(ctx context.Context, endpoint strin
 	req, _ := http.NewRequestWithContext(ctx, "PUT", u, bytes.NewReader(jsonPayload))
 	req.Header.Set(lambdaExtensionNameHeader, lambdaExtensionName)
 	req.Header.Set(lambdaExtensionIdentifierHeader, c.extensionId)
-	logger.Info("subscribing telemetry", "url", u, "name", lambdaExtensionName, "headers", req.Header, "payload", payload)
+	slog.InfoContext(ctx, "subscribing telemetry", "url", u, "name", lambdaExtensionName, "headers", req.Header, "payload", payload)
 
 	resp, err := c.client.Do(req)
 	if err != nil {
@@ -122,7 +132,7 @@ func (c *ExtensionClient) SubscribeTelemetry(ctx context.Context, endpoint strin
 	if resp.StatusCode != http.StatusOK {
 		return fmt.Errorf("failed to subscribe telemetry: %d %s", resp.StatusCode, string(b))
 	} else {
-		logger.Info("subscribed telemetry", "status", resp.Status, "response", string(b))
+		slog.InfoContext(ctx, "subscribed telemetry", "status", resp.Status, "response", string(b))
 	}
 	return nil
 }

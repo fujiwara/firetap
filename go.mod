@@ -1,13 +1,17 @@
 module github.com/fujiwara/firetap
 
-go 1.21.0
+go 1.22
 
 require (
+	github.com/PumpkinSeed/slog-context v0.1.2
 	github.com/Songmu/wrapcommander v0.1.0
+	github.com/alecthomas/kong v0.9.0
 	github.com/aws/aws-sdk-go-v2/config v1.27.16
 	github.com/aws/aws-sdk-go-v2/service/firehose v1.28.10
 	github.com/aws/aws-sdk-go-v2/service/kinesis v1.27.8
+	github.com/samber/lo v1.39.0
 	github.com/shogo82148/go-retry v1.2.0
+	golang.org/x/sys v0.21.0
 )
 
 require (
@@ -26,4 +30,5 @@ require (
 	github.com/aws/smithy-go v1.20.2 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/jmespath/go-jmespath v0.4.0 // indirect
+	golang.org/x/exp v0.0.0-20220303212507-bbda1eaf7a17 // indirect
 )

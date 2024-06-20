@@ -1,24 +1,23 @@
 package firetap
 
 import (
-	"fmt"
-	"os"
-	"strconv"
+	"log/slog"
+
+	"github.com/alecthomas/kong"
 )
 
 type Option struct {
-	StreamName string // StreamName is the name of the Kinesis Firehose/DataStream stream name.
-	DataStream bool   // DataStream is the flag to use DataStream instead of Firehose.
+	StreamName string `help:"Firehose or DataStream name" env:"FIRETAP_STREAM_NAME" required:""`
+	DataStream bool   `help:"The flag to use DataStream instead of Firehose" env:"FIRETAP_DATA_STREAM" default:"false"`
+	Port       int    `help:"The port to listen on" default:"8080" env:"FIRETAP_PORT"`
+	Debug      bool   `help:"Enable debug mode" env:"FIRETAP_DEBUG" default:"false"`
 }
 
 func NewOption() (*Option, error) {
-	ds, _ := strconv.ParseBool(os.Getenv("FIRETAP_DATA_STREAM"))
-	opt := &Option{
-		StreamName: os.Getenv("FIRETAP_STREAM_NAME"),
-		DataStream: ds,
-	}
-	if opt.StreamName == "" {
-		return nil, fmt.Errorf("FIRETAP_STREAM_NAME is required")
+	opt := &Option{}
+	kong.Parse(opt)
+	if opt.Debug {
+		LogLevel.Set(slog.LevelDebug)
 	}
 	return opt, nil
 }
