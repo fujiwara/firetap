@@ -6,32 +6,35 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"log/slog"
 	"net"
 	"net/http"
 	"strings"
 	"sync"
+
+	slogcontext "github.com/PumpkinSeed/slog-context"
 )
 
 type Receiver struct {
 	Endpoint string
-	listener net.Listener
 }
 
-func startReceiver() (*Receiver, error) {
-	listener, err := net.Listen("tcp", fmt.Sprintf(":%d", listenPort))
-	if err != nil {
-		return nil, fmt.Errorf("failed to listen: %v", err)
-	}
-	logger.Info("receiver is listening", "addr", listener.Addr())
-
+func NewReceiver(ctx context.Context) (*Receiver, error) {
 	receiver := &Receiver{
-		listener: listener,
 		Endpoint: fmt.Sprintf("http://sandbox.localdomain:%d", listenPort),
 	}
 	return receiver, nil
 }
 
 func (r *Receiver) Run(ctx context.Context, sender *LogSender) error {
+	ctx = slogcontext.WithValue(ctx, "component", "receiver")
+
+	listener, err := net.Listen("tcp", fmt.Sprintf(":%d", listenPort))
+	if err != nil {
+		return fmt.Errorf("failed to listen: %v", err)
+	}
+	slog.InfoContext(ctx, "receiver is listening", "addr", listener.Addr())
+
 	m := http.NewServeMux()
 	m.HandleFunc("/", handleTelemetry(sender))
 	srv := http.Server{Handler: m}
@@ -44,7 +47,7 @@ func (r *Receiver) Run(ctx context.Context, sender *LogSender) error {
 		log.Println("shutting down receiver")
 		srv.Shutdown(ctx)
 	}()
-	if err := srv.Serve(r.listener); err != nil {
+	if err := srv.Serve(listener); err != nil {
 		if err != http.ErrServerClosed {
 			return fmt.Errorf("failed to serve: %w", err)
 		}
@@ -53,9 +56,9 @@ func (r *Receiver) Run(ctx context.Context, sender *LogSender) error {
 	return nil
 }
 
-func handleTelemetry(sender *LogSender) func(w http.ResponseWriter, r *http.Request) {
+func handleTelemetry(sender Sender) func(w http.ResponseWriter, r *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
-		ctx := r.Context()
+		ctx := slogcontext.WithValue(r.Context(), "component", "handler")
 		if r.Method != http.MethodPost {
 			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 			return
@@ -63,27 +66,27 @@ func handleTelemetry(sender *LogSender) func(w http.ResponseWriter, r *http.Requ
 		dec := json.NewDecoder(r.Body)
 		events := []TelemetryEvent{}
 		if err := dec.Decode(&events); err != nil {
-			logger.Error("failed to decode request body", "error", err)
+			slog.ErrorContext(ctx, "failed to decode request body", "error", err)
 			http.Error(w, "failed to decode request body", http.StatusBadRequest)
 			return
 		}
-		logger.Info("telemetry received", "events", len(events))
+		slog.InfoContext(ctx, "telemetry received", "events", len(events))
 		var sent, ignored int
 		for _, event := range events {
-			logger.Debug("telemetry received", "time", event.Time, "type", event.Type)
+			slog.DebugContext(ctx, "telemetry received", "time", event.Time, "type", event.Type)
 			if event.Record == nil {
-				logger.Warn("event record is empty")
+				slog.WarnContext(ctx, "event record is empty")
 				ignored++
 				continue
 			}
-			record := *event.Record
+			record := event.Record
 			switch event.Type {
 			case "function":
 				if b, err := restoreRecode(&record); err != nil {
-					logger.Warn("failed to restore record", "error", err, "record", string(record))
+					slog.WarnContext(ctx, "failed to restore record", "error", err, "record", string(record))
 				} else {
 					if err := sender.Send(ctx, b); err != nil {
-						logger.Warn("failed to send record", "error", err)
+						slog.WarnContext(ctx, "failed to send record", "error", err)
 					} else {
 						sent++
 					}
@@ -94,18 +97,20 @@ func handleTelemetry(sender *LogSender) func(w http.ResponseWriter, r *http.Requ
 				// logger.Warn("unknown telemetry type", "type", event.Type, "record", string(record))
 			}
 		}
-		logger.Info("logs sent", "sent", sent, "ignored", ignored)
+		slog.InfoContext(ctx, "logs sent", "sent", sent, "ignored", ignored)
 		if err := sender.Flush(ctx); err != nil {
-			logger.Error("failed to flush", "error", err)
+			slog.ErrorContext(ctx, "failed to flush", "error", err)
 			http.Error(w, "failed to flush", http.StatusInternalServerError)
 		}
 	}
 }
 
+// TelemetryEvent represents an inbound Telemetry API message
+// https://docs.aws.amazon.com/lambda/latest/dg/telemetry-api.html#telemetry-api-messages
 type TelemetryEvent struct {
-	Time   string           `json:"time"`
-	Type   string           `json:"type"`
-	Record *json.RawMessage `json:"record"`
+	Time   string          `json:"time"`
+	Type   string          `json:"type"`
+	Record json.RawMessage `json:"record"`
 }
 
 var bufPool = sync.Pool{

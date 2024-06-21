@@ -3,9 +3,11 @@ package firetap
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"sync"
 	"time"
 
+	slogcontext "github.com/PumpkinSeed/slog-context"
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/firehose"
 	firehoseTypes "github.com/aws/aws-sdk-go-v2/service/firehose/types"
@@ -20,6 +22,11 @@ var retryPolicy = retry.Policy{
 	MinDelay: 100 * time.Millisecond,
 	MaxDelay: 2 * time.Second,
 	MaxCount: 10,
+}
+
+type Sender interface {
+	Send(ctx context.Context, msg []byte) error
+	Flush(ctx context.Context) error
 }
 
 type LogSender struct {
@@ -49,6 +56,7 @@ func NewSender(ctx context.Context, streamName string, dataStream bool) (*LogSen
 }
 
 func (s *LogSender) Send(ctx context.Context, msg []byte) error {
+	ctx = slogcontext.WithValue(ctx, "component", "sender")
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if len(s.buf) == maxBatchSize || s.bufSize+len(msg) > 1024*512 {
@@ -62,6 +70,7 @@ func (s *LogSender) Send(ctx context.Context, msg []byte) error {
 }
 
 func (s *LogSender) Flush(ctx context.Context) error {
+	ctx = slogcontext.WithValue(ctx, "stream", s.streamName)
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if len(s.buf) == 0 {
@@ -79,7 +88,7 @@ func (s *LogSender) flushToFirehose(ctx context.Context) error {
 	for _, r := range s.buf {
 		recs = append(recs, firehoseTypes.Record{Data: r})
 	}
-	logger.Debug("sending to firehose", "records", len(recs))
+	slog.DebugContext(ctx, "sending to firehose", "records", len(recs))
 
 	err := retryPolicy.Do(ctx, func() error {
 		_, err := s.firehose.PutRecordBatch(ctx, &firehose.PutRecordBatchInput{
@@ -91,7 +100,7 @@ func (s *LogSender) flushToFirehose(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("failed to send to firehose: %w", err)
 	} else {
-		logger.Info("sent to firehose", "records", len(recs))
+		slog.InfoContext(ctx, "sent to firehose", "records", len(recs))
 	}
 	s.resetBuffer()
 	return nil
@@ -102,7 +111,7 @@ func (s *LogSender) flushToKinesis(ctx context.Context) error {
 	for _, r := range s.buf {
 		recs = append(recs, kinesisTypes.PutRecordsRequestEntry{Data: r})
 	}
-	logger.Debug("sending to kinesis", "records", len(recs))
+	slog.DebugContext(ctx, "sending to kinesis", "records", len(recs))
 
 	err := retryPolicy.Do(ctx, func() error {
 		_, err := s.kinesis.PutRecords(ctx, &kinesis.PutRecordsInput{
@@ -114,7 +123,7 @@ func (s *LogSender) flushToKinesis(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("failed to send to kinesis: %w", err)
 	} else {
-		logger.Info("sent to kinesis", "records", len(recs))
+		slog.InfoContext(ctx, "sent to kinesis", "records", len(recs))
 	}
 	s.resetBuffer()
 	return nil
