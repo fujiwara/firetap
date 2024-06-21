@@ -2,10 +2,13 @@ package firetap
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 	"os"
 	"path/filepath"
 	"sync"
+
+	extensions "github.com/fujiwara/lambda-extensions"
 )
 
 var (
@@ -16,15 +19,11 @@ var (
 )
 
 const (
-	lambdaExtensionNameHeader       = "Lambda-Extension-Name"
-	lambdaExtensionIdentifierHeader = "Lambda-Extension-Identifier"
-	listenPort                      = 8080
-	antiRecursionEnv                = "FIRETAP_WRAPPED"
+	listenPort       = 8080
+	antiRecursionEnv = "FIRETAP_WRAPPED"
 )
 
 func init() {
-	lambdaExtensionAPIEndpoint = "http://" + os.Getenv("AWS_LAMBDA_RUNTIME_API") + "/2020-01-01/extension"
-	lambdaTelemetryAPIEndpoint = "http://" + os.Getenv("AWS_LAMBDA_RUNTIME_API") + "/2022-07-01/telemetry"
 	lambdaExtensionName = filepath.Base(os.Args[0])
 }
 
@@ -40,12 +39,19 @@ func Run(ctx context.Context, opt *Option) error {
 		return err
 	}
 
-	ext := NewExtensionClient(ctx)
+	ext := extensions.NewClient(lambdaExtensionName)
+	ext.CallbackShutdown = func(ctx context.Context, ev *extensions.ShutdownEvent) error {
+		slog.InfoContext(ctx, "shutdown event received", "deadline", ev.DeadlineMs)
+		cancel()
+		return nil
+	}
 	if err := ext.Register(ctx); err != nil {
 		slog.ErrorContext(ctx, "failed to register extension", "error", err)
 		return err
 	}
-	if err := ext.SubscribeTelemetry(ctx, rcv.Endpoint); err != nil {
+	sub := extensions.DefaultTelemetrySubscription
+	sub.Destination.URI = fmt.Sprintf("http://sandbox.localdomain:%d", listenPort)
+	if err := ext.SubscribeTelemetry(ctx, &sub); err != nil {
 		slog.ErrorContext(ctx, "failed to subscribe telemetry", "error", err)
 		return err
 	}
@@ -57,13 +63,14 @@ func Run(ctx context.Context, opt *Option) error {
 	}
 
 	var wg sync.WaitGroup
-	wg.Add(3)
+	wg.Add(2)
 	go func() {
 		defer wg.Done()
-		err := ext.Run(ctx, cancel)
+		err := ext.Run(ctx)
 		if err != nil {
 			slog.ErrorContext(ctx, "failed to run extension client", "error", err)
 		}
+		slog.InfoContext(ctx, "extension client stopped")
 	}()
 	go func() {
 		defer wg.Done()
@@ -71,7 +78,9 @@ func Run(ctx context.Context, opt *Option) error {
 		if err != nil {
 			slog.ErrorContext(ctx, "failed to run receiver", "error", err)
 		}
+		slog.InfoContext(ctx, "receiver stopped")
 	}()
 	wg.Wait()
+	slog.InfoContext(ctx, "firetap stopped")
 	return nil
 }

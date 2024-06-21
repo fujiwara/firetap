@@ -9,6 +9,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/config v1.27.16
 	github.com/aws/aws-sdk-go-v2/service/firehose v1.28.10
 	github.com/aws/aws-sdk-go-v2/service/kinesis v1.27.8
+	github.com/fujiwara/lambda-extensions v0.0.5
 	github.com/samber/lo v1.39.0
 	github.com/shogo82148/go-retry v1.2.0
 	golang.org/x/sys v0.21.0
@@ -32,3 +33,5 @@ require (
 	github.com/jmespath/go-jmespath v0.4.0 // indirect
 	golang.org/x/exp v0.0.0-20220303212507-bbda1eaf7a17 // indirect
 )
+
+// replace github.com/fujiwara/lambda-extensions => ../lambda-extensions
