@@ -35,7 +35,7 @@ jobs:
 
       # after tagpr adds a release tag, or workflow_dispatch, release it
       - name: Run GoReleaser
-        uses: goreleaser/goreleaser-action@v5
+        uses: goreleaser/goreleaser-action@v6
         with:
           version: latest
           args: release
