@@ -10,7 +10,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/firehose v1.28.10
 	github.com/aws/aws-sdk-go-v2/service/kinesis v1.27.8
 	github.com/samber/lo v1.39.0
-	github.com/shogo82148/go-retry v1.2.0
+	github.com/shogo82148/go-retry v1.3.1
 	golang.org/x/sys v0.21.0
 )
 
