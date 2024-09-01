@@ -11,7 +11,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/kinesis v1.27.8
 	github.com/samber/lo v1.39.0
 	github.com/shogo82148/go-retry v1.2.0
-	golang.org/x/sys v0.21.0
+	golang.org/x/sys v0.24.0
 )
 
 require (
